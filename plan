@@ -1,0 +1,136 @@
+Design Document for pstty
+-----------------------------------------------------------
+Code by: Zachary Weed 
+-----------------------------------------------------------
+
+Purpose:
+
+  pstty (partial stty) is used for defining configuration settings on a terminal device
+
+Outline:
+
+  pstty works by using ioctl(), tcsetattr(), tcgetattr(), and the termios struct as a 
+  means of both displaying and configuring the current teletype (tty) device. While it
+  does not yet support all of the flags in many *nix systems, only supporing: erase, kill,
+  intr, echo, isig, igncr, parodd, min, and time, thus far. We accomplish this through 
+  storing the state of each of the values in a struct, and associating a function pointer
+  member with the structs, that provides a simple way of modifying the values, without
+  iterating through all of the flags individually and explicitly.
+
+Layering:               
+  _________________________________________________________________________________________________
+  |                                                                                               | 
+  |  $ pstty---->------|                                                                          |
+  |  |                 |         ----------                                                       |
+  |  |                 |----->---|        |___________________                                    |
+  |  |                           |  main  |------------------|                                    |
+  |  |                 __________|________|__________        |                                    |
+  |  |          ______|____           |     ________|______  |                                    |
+  |  |          |         |           |     |             |  |                                    |
+  |  |          | ioctl() |           |     | tcgetattr() |  |                                    |
+  |  |          |_________|           |     |_____________|  |                                    |
+  |  |                                |                      |                                    |
+  |  | ____________________        -----------------------   |                                    |
+  |  | |                  |        |                     |   |----------------|                   |
+  |  | | *value_handler() |--------| build_stty_config() |           ---------|--------           |
+  |  | |__________________|  |-----|_____________________|           |                |--->----|| |
+  |  |  |              ______|  _____|       |          |            | print_output() |-------||| |
+  |  |  |   __________|____  __|_________ ___|_______ __|_________   |________________|---|-| ||| |
+  |  |  |   |            |  |          | |          | |          |          |             | | ||| |
+  |  |  |   |  lflags()  |  | cchars() | | cflags() | | iflags() |   _______|___________  | | ||| |
+  |  |  |   |____________|  |__________| |__________| |__________|  |<|                 | | | ||| |
+  |  |  |>-|--------->-----|--------->----------|                   | | print_header()  |<| | ||| |
+  |  |  ___|___________   _|____________  ______|____________       | |_________________|   | ||| |
+  |  |   |             |  |              | |                  |     |                       | ||| |
+  |  |   | flip_flag() |  | assign_int() | |  assign_cchar()  |     |                       | ||| |
+  |  |   |_____________|  |______________| |__________________|     |  ___________________  | ||| |
+  |  |   ___|________________________ _______|_____________________ |  |                 |<-- ||| |
+  |  |   |                          | |                           | ||<| print_iflags()  |    ||| |
+  |  |   | int_argument_suppliedP() | |  set_control_character()  | || |_________________|    ||| |
+  |  |   |__________________________| |___________________________| ||                        ||| |
+  |  |                                                              ||  ___________________   ||| | 
+  |  |    _________________________________________________________ ||  |                 |<--||| |
+  |  |    |$ pstty                                                | |||<| print_cflags()  |   ||| |
+  |  |    |speed 38400 baud; 51 rows; 127 columns;                | ||| |_________________|   ||| |
+  |  |    |lflags: echo -isig                                     | |||                       ||| |
+  |  |    |iflags: -igncr                                         | |||  -------------------  ||| |
+  |  |-->-|cflags: parodd                                         | |||  |                 |  ||| |
+  |       |cchars: intr ^C min = ^A time = ^@ eras = ^? kill = ^0 | ||| <| print_cchars()  |<- |  |
+  |       |_______________________________________________________| ||| ||_________________|   |  |
+  |             |                                                   ||| |                      |  |
+  |             |                                                   ||| | -------------------  |  |
+  |             |                                                   ||| | |                 |  |  |
+  |             |                                                   ||| |<| print_iflags()  |<--  |
+  |             <___________________________________________________|||_|||_________________|     |
+  |_______________________________________________________________________________________________|
+
+Data Structures:
+  __________________________________________________________________________________________________
+  | |--------------------------------------------------------------------------------------------| |
+  | |                                                                                            | |
+  | |                                      struct stty_value                                     | |
+  | |____________________________________________________________________________________________| |
+  | |      char *name        |       char *key         |   (*value_handler)()   | int int_value  | |
+  | |------------------------|-------------------------|------------------------|----------------| |
+  | |  name of the value     | constant of value       |  function pointer      |  if *type int  | |
+  | |  (e.g. echo, icanon)   |                         |  of handling valye     |  then value    | |
+  | |________________________|_________________________|________________________|________________| |
+  | |________________________|_________________________|________________________|________________| |
+  |                                                                                                |
+  |  ____________________________________________________________________________________________  |
+  | |                                                                                            | |
+  | |                                        struct stty                                         | |
+  | |____________________________________________________________________________________________| |
+  | |                            |                                         |                     | |
+  | | int flag_group_length      |  struct stty_value *c/cc/l/i/all_flags  |     int length      | |
+  | |----------------------------|-----------------------------------------|---------------------| |
+  | | total flags in group       |   stty_values by type and grouped       | length of all flags | |
+  | |                            |                                         |                     | |
+  | |                            |                                         |                     | |
+  | |                            |                                         |                     | |
+  | |                            |                                         |                     | |
+  | -----------------------------|-----------------------------------------|---------------------| |
+  | | int c/cc/i/lflag_length    |                                         |                     | |
+  | |----------------------------|-----------------------------------------|---------------------| |
+  | | flags by group             |                                         |                     | |
+  | |                            |                                         |                     | |
+  | |                            |                                         |                     | |
+  | |                            |                                         |                     | |
+  | |                            |                                         |                     | |
+  | |----------------------------|-----------------------------------------|---------------------| |
+  | |____________________________|_________________________________________|_____________________| |
+  |________________________________________________________________________________________________|
+
+Data Structures Explained
+
+  The main structure is stty, which encompasses a series of stty_value structs, that are both 
+  grouped together and split on flag type (i.e. cflags, ccflags, iflags, lflags, etc.) The grouping
+  is in a member called all_flags. Additionally, there are positional lengths, where: index 0 is lflags, 
+  index 1 is iflags, index 2 is control characters, and index 3 is cflags. From this we can access each
+  position and identify the length of flags, providing help for iterating through the list of flags.
+
+  As mentioned above, the stty struct contains stty_values. These are the values that are normally found 
+  if we call `pstty -a`, such as (igncr, echo, icanon, etc.) Each of these flags are accessible through 
+  their name (how the flag is displayed) and through their key (the constant representing the integer 
+  value of the flag). That being said, there is also a member that represents what is essentially a 
+  lambda function, through a function pointer called (*value_handler)(). This function pointer points
+  to a function that is associated with the value that handles flipping flags, setting control characters, 
+  and setting integer values of the stty value, depending on the attribute type.
+
+Headers
+
+  - stdio.h: for handling input/output
+  - termios.h: for working with terminal
+  - unistd.h: unix standard library helpers
+  - string.h: providing access to string functions
+  - sys/ioctl.h: for handling window size
+  - stdlib.h: for things like atio()
+
+System Calls:
+
+  - #ioctl()
+    - for grabbing window configuration 
+
+File Structure:
+
+  pstty.c  -- the main 19 functions listed above
