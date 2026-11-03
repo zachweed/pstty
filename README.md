@@ -1,46 +1,44 @@
-PSTTY
+pstty
 ======
 
   An implementation of tty, a tool for displaying terminal configuration
 
-SYNOPSIS
+synopsis
 --------
 
   pstty [-a] [arguments]
 
-DESCRIPTION
+description
 -----------
 
   stty provides current tty (teletype) config of the current terminal device
 
-OPTIONS
+options
 -------
 
   -a  Display all options
 
-
-EXAMPLES
+examples
 --------
   
   pstty -a
   pstty icanon
 
 
-COMPILING
+compilinf
 ---------
   
   make clean
   make
 
-
-NOTES
+notes
 -----
 
   - Works with lstat (not nftw / ftw) and recursion in traversing directories and providing block size,
   - Uniqueness is handled via compound-key of (inode, device_id), &
   - Like du, if an error is found, while the error is returned to main, it does not prevent further traversal
 
-STATUS CODES
+status codes
 ------------
 
   0 Success
