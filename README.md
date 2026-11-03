@@ -25,7 +25,7 @@ examples
   pstty icanon
 
 
-compilinf
+compiling
 ---------
   
   make clean
