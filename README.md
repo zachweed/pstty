@@ -31,13 +31,6 @@ compiling
   make clean
   make
 
-notes
------
-
-  - Works with lstat (not nftw / ftw) and recursion in traversing directories and providing block size,
-  - Uniqueness is handled via compound-key of (inode, device_id), &
-  - Like du, if an error is found, while the error is returned to main, it does not prevent further traversal
-
 status codes
 ------------
 
