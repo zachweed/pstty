@@ -1,10 +1,5 @@
-all: pstty demotwo
-
-pstty: pstty.c flag_handlers.c flags.c print_util.c
-	cc -Wall -Wextra pstty.c flag_handlers.c flags.c print_util.c -o pstty
-
-demotwo: demotwo.c flag_handlers.c flags.c print_util.c
-	cc -Wall -Wextra demotwo.c flag_handlers.c flags.c print_util.c -o demotwo
+pstty: ./src/pstty.c ./src/flag_handlers.c ./src/flags.c ./src/print_util.c
+	cc -Wall -Wextra ./src/pstty.c ./src/flag_handlers.c ./src/flags.c ./src/print_util.c ./src/stty.c ./src/stty_value.c -o pstty
 
 clean:
 	rm -rf pstty demotwo
