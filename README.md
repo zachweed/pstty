@@ -20,14 +20,15 @@ options
 
 examples
 --------
-  
+
   pstty -a
   pstty icanon
 
 
 compiling
 ---------
-  
+
+  cd src
   make clean
   make
 
